@@ -1,0 +1,38 @@
+{
+  "name": "imagemin-preserve-structure",
+  "version": "1.0.0",
+  "description": "A small node script to preserve folder structure when using imagemin",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/B-Henderson/imagemin-preserve-structure.git"
+  },
+  "keywords": [
+    "imagemin",
+    "keep",
+    "folder",
+    "structure",
+    "preserve",
+    "folder",
+    "structure"
+  ],
+  "author": "Ben Henderson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/B-Henderson/imagemin-preserve-structure/issues"
+  },
+  "bin": {
+    "imageps": "./index.js"
+  },
+  "homepage": "https://github.com/B-Henderson/imagemin-preserve-structure#readme",
+  "dependencies": {
+    "imagemin": "^5.3.1",
+    "imagemin-gifsicle": "^5.2.0",
+    "imagemin-jpegtran": "^5.0.2",
+    "imagemin-optipng": "^5.2.1",
+    "imagemin-svgo": "^6.0.0"
+  }
+}
