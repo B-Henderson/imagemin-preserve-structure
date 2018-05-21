@@ -17,6 +17,7 @@
  **/
 
 const path = require('path')
+const fs = require('fs')
 const readline = require('readline')
 const Imagemin = require('imagemin')
 const imageminJpegtran = require('imagemin-jpegtran')
@@ -44,6 +45,8 @@ let outdir = process.env.PWD
 
 // verbose logging defaulted false
 let verbose = false
+
+let promises = []
 
 /**
  *output all folders into this parent directory i.e. creates a images folder in dist
@@ -88,43 +91,53 @@ if (process.argv.indexOf('-rl') !== -1) {
 }
 
 if (process.argv.indexOf('-e') !== -1) {
-  entry = process.argv[process.argv.indexOf('-e') + 1]
-  return optimizeImage(entry)
-}
+  let arr = []
+  for (let i = process.argv.indexOf('-e') + 1; i < process.argv.length; i++) {
+    promises.push(
+      new Promise((resolve, reject) => {
+        fs.stat(process.argv[i], function(err, stat) {
+          if (err) {
+            return reject('nofile')
+          }
 
-/**
- * FUNCTION imagemin
- * @PARAM {string} srcpath   source path to the file to be optomized
- * @PARAM {string} destpath output path for optomized images
- * @PARAM {function} plugins for imaginemin to deal with formats
- *
- * @DESCRIPTION creates a promise to imagemin that is used to optomize images
- * @RETURN returns a message in the console with success or error message
- **/
+          let { srcpath, p, plugin } = optimizeImage(
+            path.normalize(process.argv[i])
+          )
+          if (p.dest === undefined || p.ext === '' || plugin === null) {
+            return reject('no file extension')
+          }
 
-function imagemin(srcpath, destpath, plugin) {
-  Imagemin([srcpath], destpath, {
-    plugins: [plugin]
-  })
-    .then(files => {
-      if (files && verbose) {
-        console.log(
-          colors.Bright + colors.fg.Green,
-          ticksymbol,
-          colors.Reset,
-          destpath
-        )
-        process.exit()
-      }
-    })
-    .catch(err => {
-      console.log(
-        colors.Bright + colors.fg.Red,
-        'cross, there was an error',
-        err,
-        colors.Reset
-      )
-    })
+          imagemin(srcpath, p.dest, plugin)
+            .then(function() {
+              resolve('done')
+              console.log(
+                colors.Bright + colors.fg.Green,
+                ticksymbol,
+                colors.Reset,
+                p.dest
+              )
+            })
+            .catch(function(err) {
+              reject('failed')
+              console.log(
+                colors.Bright + colors.fg.Red,
+                'cross, there was an error',
+                err,
+                colors.Reset
+              )
+            })
+        })
+      })
+        .then(function(t) {
+          // console.log('success', t)
+        })
+        .catch(function(err) {
+          // return console.log('error', err)
+        })
+    )
+  }
+  // entry = process.argv[process.argv.indexOf('-e') + 1]
+  // return optimizeImage(entry)
 }
 
 /**
@@ -138,13 +151,16 @@ function imagemin(srcpath, destpath, plugin) {
  **/
 
 function getPathInfo(srcpath) {
-  console.log('srcpath', srcpath)
-
   /**
    * path.extname - node function to return extension of path
    * path.sep get the seperator in the string '/' here
    * subpath removes the folders up to images
    **/
+  console.log('srcpath', srcpath)
+  if (!path.extname(srcpath)) {
+    console.log('should hit here')
+    return {}
+  }
 
   var ext = path.extname(srcpath),
     parts = srcpath.split(path.normalize(path.sep)),
@@ -155,7 +171,7 @@ function getPathInfo(srcpath) {
 
   // adds the output dir to the start of subpath
   subpath.unshift(outdir)
-  console.log(subpath)
+
   //join the array using the seperator '/' and normalize it
   return {
     dest: path.normalize(subpath.join(path.sep)),
@@ -164,37 +180,64 @@ function getPathInfo(srcpath) {
 }
 
 /**
+ * FUNCTION imagemin
+ * @PARAM {string} srcpath   source path to the file to be optomized
+ * @PARAM {string} destpath output path for optomized images
+ * @PARAM {function} plugins for imaginemin to deal with formats
+ *
+ * @DESCRIPTION creates a promise to imagemin that is used to optomize images
+ * @RETURN returns a message in the console with success or error message
+ **/
+
+const imagemin = (srcpath, destpath, plugin) =>
+  new Promise((resolve, reject) => {
+    Imagemin([srcpath], destpath, {
+      plugins: [plugin]
+    })
+      .then(files => {
+        resolve(files.join(','))
+      })
+      .catch(err => {
+        reject(err)
+      })
+  })
+
+/**
  * FUNCTION optimizeImage
  *PARAM {string} image files path
  * gets the path details @see getPathInfo
  **/
-function optimizeImage(srcpath) {
-  var p = getPathInfo(srcpath)
+const optimizeImage = srcpath => {
+  let p = getPathInfo(srcpath)
+  if (p === null) {
+    return null
+  }
+  let plugin = null
   // switch statement to determine which plugin to use
   switch (p.ext) {
     case '.jpg':
-      imagemin(srcpath, p.dest, imageminJpegtran({ progressive: true }))
+      plugin = imageminJpegtran()
       break
+
     case '.png':
-      imagemin(srcpath, p.dest, imageminOptipng({ optimizationLevel: 5 }))
+      plugin = imageminOptipng({ optimizationLevel: 3 })
       break
     case '.gif':
-      imagemin(srcpath, p.dest, imageminGifsicle({ interlaced: true }))
+      plugin = imageminGifsicle({ interlaced: true })
       break
+
     case '.svg':
-      imagemin(
-        srcpath,
-        p.dest,
-        imageminSvgo({
-          plugins: [
-            { removeUselessDefs: false },
-            { cleanupIDs: false },
-            { removeViewBox: false }
-          ]
-        })
-      )
+      plugin = imageminSvgo({
+        plugins: [
+          { removeUselessDefs: false },
+          { cleanupIDs: false },
+          { removeViewBox: false }
+        ]
+      })
       break
   }
+
+  return { srcpath, p, plugin }
 }
 
 //when image is passed in
@@ -203,3 +246,7 @@ if (readlines) {
     optimizeImage(line)
   })
 }
+
+Promise.all(promises).then(function(pro) {
+  process.exit()
+})
