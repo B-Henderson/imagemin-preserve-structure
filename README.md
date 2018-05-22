@@ -15,15 +15,15 @@
 
 ## Usage
 
-###Basic usage with the command line:
+### Basic usage with the command line:
 
-####input
+#### Input
 
 ```
  npx imageps -e images/test/*.*  -o dist -v
 ```
 
-####output
+#### Output
 
 ```
  ✔  dist\images\test\conflig.jpg
@@ -33,9 +33,9 @@
 
 preserving the folder structure into the dist folder
 
-###Using a pipe from glob
+### Using a pipe from glob
 
-####input
+#### Input
 
 ```
  npx glob \"./assets/src/images/**/*.{png,jpg,gif,svg}\" | npx imageps -rl -v -o  dist
