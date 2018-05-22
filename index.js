@@ -47,7 +47,7 @@ let outdir = process.env.PWD
 let verbose = false
 
 let promises = []
-
+let rl
 /**
  *output all folders into this parent directory i.e. creates a images folder in dist
  *also used to slice the string and remove the base dir
@@ -70,42 +70,26 @@ let readlines = false
  *@PROPERY output the writeable stream to write data to: process.stout here
  *@PROPERY terminal defaulted to false, will treat the input as if it is tty, may cause double printing on windows
  **/
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false
-})
 
-// Handle the optional `-o` argument for the destination folder
-if (process.argv.indexOf('-o') !== -1) {
-  outdir = path.normalize(process.argv[process.argv.indexOf('-o') + 1])
-}
-
-// Handle the optional `-v` argument for verbose logging
-if (process.argv.indexOf('-v') !== -1) {
-  verbose = true
-}
-
-if (process.argv.indexOf('-rl') !== -1) {
-  readlines = true
-}
-
-if (process.argv.indexOf('-e') !== -1) {
+var processFiles = () => {
   let arr = []
   for (let i = process.argv.indexOf('-e') + 1; i < process.argv.length; i++) {
     promises.push(
       new Promise((resolve, reject) => {
         fs.stat(process.argv[i], function(err, stat) {
           if (err) {
-            return reject('nofile')
+            return reject()
           }
 
           let { srcpath, p, plugin } = optimizeImage(
             path.normalize(process.argv[i])
           )
           if (p.dest === undefined || p.ext === '' || plugin === null) {
-            return reject('no file extension')
+            return reject()
           }
+
+          let filename = srcpath.split(path.sep)
+          filename = filename[filename.length - 1]
 
           imagemin(srcpath, p.dest, plugin)
             .then(function() {
@@ -114,7 +98,7 @@ if (process.argv.indexOf('-e') !== -1) {
                 colors.Bright + colors.fg.Green,
                 ticksymbol,
                 colors.Reset,
-                p.dest
+                p.dest + path.sep + filename
               )
             })
             .catch(function(err) {
@@ -128,16 +112,14 @@ if (process.argv.indexOf('-e') !== -1) {
             })
         })
       })
-        .then(function(t) {
-          // console.log('success', t)
-        })
+        .then(function(t) {})
         .catch(function(err) {
-          // return console.log('error', err)
+          if (err) {
+            console.log('error', err)
+          }
         })
     )
   }
-  // entry = process.argv[process.argv.indexOf('-e') + 1]
-  // return optimizeImage(entry)
 }
 
 /**
@@ -156,9 +138,8 @@ function getPathInfo(srcpath) {
    * path.sep get the seperator in the string '/' here
    * subpath removes the folders up to images
    **/
-  console.log('srcpath', srcpath)
+
   if (!path.extname(srcpath)) {
-    console.log('should hit here')
     return {}
   }
 
@@ -207,7 +188,7 @@ const imagemin = (srcpath, destpath, plugin) =>
  *PARAM {string} image files path
  * gets the path details @see getPathInfo
  **/
-const optimizeImage = srcpath => {
+var optimizeImage = srcpath => {
   let p = getPathInfo(srcpath)
   if (p === null) {
     return null
@@ -240,13 +221,55 @@ const optimizeImage = srcpath => {
   return { srcpath, p, plugin }
 }
 
-//when image is passed in
-if (readlines) {
-  rl.on('line', line => {
-    optimizeImage(line)
+// Handle the optional `-o` argument for the destination folder
+if (process.argv.indexOf('-o') !== -1) {
+  outdir = path.normalize(process.argv[process.argv.indexOf('-o') + 1])
+}
+
+// Handle the optional `-v` argument for verbose logging
+if (process.argv.indexOf('-v') !== -1) {
+  verbose = true
+}
+
+if (process.argv.indexOf('-rl') !== -1) {
+  readlines = true
+
+  rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false
   })
 }
 
-Promise.all(promises).then(function(pro) {
-  process.exit()
-})
+if (process.argv.indexOf('-e') !== -1) {
+  processFiles()
+}
+
+//when image is passed in
+if (readlines) {
+  rl.on('line', line => {
+    let { srcpath, p, plugin } = optimizeImage(line)
+
+    let filename = srcpath.split(path.sep)
+    filename = filename[filename.length - 1]
+
+    imagemin(srcpath, p, plugin)
+      .then(function(t) {
+        console.log(
+          colors.Bright + colors.fg.Green,
+          ticksymbol,
+          colors.Reset,
+          p.dest + path.sep + filename
+        )
+      })
+      .catch(function(err) {
+        console.log(
+          colors.Bright + colors.fg.Red,
+          cross,
+          'there was an error',
+          err,
+          colors.Reset
+        )
+      })
+  })
+}
